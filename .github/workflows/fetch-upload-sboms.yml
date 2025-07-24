@@ -34,7 +34,7 @@ jobs:
       max-parallel: 10
     steps:
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y jq
+        run: sudo apt-get update && sudo apt-get install -y jq gnupg
 
       - name: Prepare SBOM directory
         run: mkdir -p sboms
@@ -64,6 +64,8 @@ jobs:
             echo "Processing $artifactId:$version"
             JSON_SBOM_URL="https://repo1.maven.org/maven2/$groupPath/$artifactId/$version/$artifactId-$version-cyclonedx.json"
             JSON_SBOM_FILE="sboms/$artifactId-$version-cyclonedx.json"
+            SIG_URL="https://repo1.maven.org/maven2/$groupPath/$artifactId/$version/$artifactId-$version-cyclonedx.json.asc"
+            SIG_FILE="sboms/$artifactId-$version-cyclonedx.json.asc"
             SBOM_FILE=""
             DOWNLOAD_SUCCESS=false
 
@@ -78,6 +80,45 @@ jobs:
             done
 
             if [ "$DOWNLOAD_SUCCESS" = true ]; then
+              # Attempt to download and verify signature
+              if curl -s -f -o "$SIG_FILE" "$SIG_URL"; then
+                echo "Downloaded signature for $artifactId:$version"
+
+                # Extract key ID from the GPG verification output
+                # This uses --dry-run to avoid importing keys or writing changes
+                KEY_ID=$(gpg --dry-run --verify "$SIG_FILE" "$JSON_SBOM_FILE" 2>&1 | grep 'using [A-Z]* key' | awk '{print $NF}' | tail -n1)
+
+                if [ -n "$KEY_ID" ]; then
+                  echo "Importing public key $KEY_ID from keyserver..."
+
+                  # Check if the public key is already present
+                  if ! gpg --list-keys "$KEY_ID" > /dev/null 2>&1; then
+                    # If not present, fetch it from the Ubuntu keyserver
+                    gpg --keyserver keyserver.ubuntu.com --recv-keys "$KEY_ID" || {
+                      echo "Failed to import public key $KEY_ID"
+                      continue
+                    }
+                  else
+                    echo "Public key $KEY_ID already present"
+                  fi
+                else
+                  echo "Could not determine key ID from signature"
+                  continue
+                fi
+
+                # Perform the actual GPG signature verification
+                if gpg --verify "$SIG_FILE" "$JSON_SBOM_FILE"; then
+                  echo "✅ Signature verification passed for $artifactId:$version"
+                else
+                  echo "Signature verification failed for $artifactId:$version"
+                  continue
+                fi
+              else
+                # Skip the upload if no signature was found
+                echo "No signature found for $artifactId:$version. Skipping upload."
+                continue
+              fi
+
               echo "Uploading SBOM for $artifactId:$version"
               echo "SBOM_FILE=$SBOM_FILE" >> $GITHUB_ENV
               echo "VERSION=$version" >> $GITHUB_ENV
