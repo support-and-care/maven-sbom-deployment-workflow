@@ -1,0 +1,59 @@
+name: dependency-track
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dtrack
+      POSTGRES_USER: ${SERVICE_USER_POSTGRES}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - internal
+
+  apiserver:
+    image: ghcr.io/dependencytrack/apiserver:5.0.2
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DT_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dtrack
+      DT_DATASOURCE_USERNAME: ${SERVICE_USER_POSTGRES}
+      DT_DATASOURCE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - apiserver-data:/data
+    networks:
+      - internal
+      - public
+    expose:
+      - "8080"
+
+  frontend:
+    image: ghcr.io/dependencytrack/frontend:5.0.2
+    restart: unless-stopped
+    depends_on:
+      - apiserver
+    environment:
+      API_BASE_URL: ${SERVICE_URL_APISERVER}
+    networks:
+      - public
+    expose:
+      - "8080"
+
+volumes:
+  postgres-data:
+  apiserver-data:
+
+networks:
+  internal:
+    internal: true
+  public:
+  
