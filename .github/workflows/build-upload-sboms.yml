@@ -47,7 +47,7 @@ jobs:
         run: mvn org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
 
       - name: Upload SBOM to DependencyTrack
-        uses: DependencyTrack/gh-upload-sbom@v3
+        uses: DependencyTrack/gh-upload-sbom@v4
         with:
           serverHostname: 'api.dependencytrack.open-elements.cloud'
           apiKey: ${{ secrets.DEPENDENCYTRACK_API_KEY }}
