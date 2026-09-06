@@ -19,7 +19,7 @@ services:
       - internal
 
   apiserver:
-    image: ghcr.io/dependencytrack/apiserver:5.0.2
+    image: ghcr.io/dependencytrack/apiserver:5.1.0
     restart: unless-stopped
     depends_on:
       postgres:
