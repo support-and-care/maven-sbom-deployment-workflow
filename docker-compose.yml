@@ -37,7 +37,7 @@ services:
       - "8080"
 
   frontend:
-    image: ghcr.io/dependencytrack/frontend:5.0.2
+    image: ghcr.io/dependencytrack/frontend:5.1.0
     restart: unless-stopped
     depends_on:
       - apiserver
