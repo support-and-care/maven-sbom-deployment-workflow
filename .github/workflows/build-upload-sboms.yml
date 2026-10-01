@@ -16,7 +16,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Checkout this repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Read repos.json and convert to matrix
         id: set-matrix
