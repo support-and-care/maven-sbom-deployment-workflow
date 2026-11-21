@@ -18,10 +18,12 @@ jobs:
       - name: Checkout this repo
         uses: actions/checkout@v4
 
-      - name: Read repos.json and convert to matrix
+      - name: Read Maven projects from repos.json and convert to matrix
         id: set-matrix
         run: |
-          JSON=$(cat repos.json | jq -c)
+          # Only Maven projects can be built here; other ecosystems (e.g. pypi)
+          # are handled by fetch-upload-sboms.yml
+          JSON=$(jq -c '[.[] | select(.ecosystem == "maven")]' repos.json)
           echo "matrix=$JSON" >> $GITHUB_OUTPUT
 
   build-and-upload-sboms:
@@ -31,6 +33,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.read-repos.outputs.matrix) }}
       fail-fast: false
+      max-parallel: 10
 
     steps:
       - name: Clone repo ${{ matrix.name }}
@@ -45,7 +48,16 @@ jobs:
 
       - name: Generate SBOM using CycloneDX
         working-directory: ./${{ matrix.name }}
-        run: mvn org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
+        run: |
+          # Retry to survive transient Maven Central errors such as 429 Too Many Requests
+          for attempt in 1 2 3; do
+            mvn -B org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom && exit 0
+            if [ "$attempt" -lt 3 ]; then
+              echo "Attempt $attempt failed, retrying in $((attempt * 30))s..."
+              sleep $((attempt * 30))
+            fi
+          done
+          exit 1
 
       - name: Upload SBOM to DependencyTrack
         uses: DependencyTrack/gh-upload-sbom@v3
