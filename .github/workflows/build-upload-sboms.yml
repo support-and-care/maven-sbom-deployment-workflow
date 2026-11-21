@@ -60,7 +60,7 @@ jobs:
           exit 1
 
       - name: Upload SBOM to DependencyTrack
-        uses: DependencyTrack/gh-upload-sbom@v3
+        uses: DependencyTrack/gh-upload-sbom@v4
         with:
           serverHostname: 'apiserver-mglnxlm8fsyhwlp7xgwjqa56.production.open-elements.cloud'
           apiKey: ${{ secrets.DEPENDENCYTRACK_API_KEY }}
